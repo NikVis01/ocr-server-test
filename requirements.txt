@@ -1,0 +1,5 @@
+fastapi
+paddleocr
+numpy
+cv2
+
