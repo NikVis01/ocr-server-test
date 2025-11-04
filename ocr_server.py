@@ -1,4 +1,3 @@
-# Will take either a bucket url or a local file path from client
 from fastapi import FastAPI, File, UploadFile, HTTPException, Form
 from fastapi.responses import JSONResponse
 import numpy as np
@@ -7,6 +6,10 @@ import requests
 from paddleocr import PaddleOCRVL
 
 app = FastAPI(title="PaddleOCR-VL Service")
+
+@app.get("/health")
+def health():
+    return {"status": "ok"}
 
 pipeline = PaddleOCRVL()
 
@@ -52,3 +55,5 @@ async def infer(
         })
 
     return JSONResponse(content={"results": results})
+
+

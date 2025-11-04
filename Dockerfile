@@ -4,11 +4,13 @@ FROM paddlepaddle/paddleocr-vl:latest
 # Set working dir
 WORKDIR /app
 
+COPY requirements.txt /app/requirements.txt
+RUN pip install --no-cache-dir -r /app/requirements.txt
+
 # Copy your FastAPI server file
 COPY ocr_server.py /app/ocr_server.py
 
-# Install FastAPI and Uvicorn (if not already in base)
-RUN pip install fastapi uvicorn[standard] numpy opencv-python
+# (Dependencies installed from requirements.txt above)
 
 # Expose port for service
 EXPOSE 8000

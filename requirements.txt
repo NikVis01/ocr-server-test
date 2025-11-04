@@ -1,9 +1,8 @@
 fastapi
-paddleocr
+uvicorn[standard]
 numpy
 opencv-python
-scipy
-paddle
+requests
 python-multipart
 paddlepaddle
-uvicorn
+paddleocr
