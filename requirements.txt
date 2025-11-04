@@ -1,5 +1,9 @@
 fastapi
 paddleocr
 numpy
-cv2
-
+opencv-python
+scipy
+paddle
+python-multipart
+paddlepaddle
+uvicorn
