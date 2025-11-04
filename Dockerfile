@@ -23,4 +23,4 @@ PY
 EXPOSE 8080
 
 # Command to run when container starts
-CMD ["uvicorn", "ocr_server:app", "--host", "0.0.0.0", "--port", "8080"]
+CMD ["uvicorn", "ocr_server:app", "--host", "0.0.0.0", "--port", "80"]
