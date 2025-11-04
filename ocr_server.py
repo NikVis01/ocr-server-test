@@ -3,15 +3,15 @@ from fastapi.responses import JSONResponse
 import numpy as np
 import cv2
 import requests
-from paddleocr import PaddleOCRVL
+from paddleocr import PaddleOCR
 
-app = FastAPI(title="PaddleOCR-VL Service")
+app = FastAPI(title="PaddleOCR Service")
 
 @app.get("/health")
 def health():
     return {"status": "ok"}
 
-pipeline = PaddleOCRVL()
+pipeline = PaddleOCR(use_angle_cls=True, lang='en')
 
 @app.post("/infer/")
 async def infer(
@@ -37,22 +37,29 @@ async def infer(
     img = cv2.imdecode(arr, cv2.IMREAD_COLOR)
     if img is None:
         raise HTTPException(status_code=400, detail="Could not decode image bytes")
-    img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+    # PaddleOCR expects BGR; keep as-is
 
     # inference
     try:
-        output = pipeline.predict(img)
+        output = pipeline.ocr(img, cls=True)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Inference failed: {e}")
 
     # format results
     results = []
-    for res in output:
-        results.append({
-            "text": getattr(res, "text", None),
-            "confidence": getattr(res, "confidence", None),
-            "bbox": getattr(res, "bbox", None)
-        })
+    # output is list per image; each item is list of (bbox, (text, score))
+    for lines in output:
+        if not lines:
+            continue
+        for item in lines:
+            bbox = item[0]
+            text = item[1][0]
+            score = float(item[1][1])
+            results.append({
+                "text": text,
+                "confidence": score,
+                "bbox": bbox
+            })
 
     return JSONResponse(content={"results": results})
 
