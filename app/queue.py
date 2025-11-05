@@ -1,19 +1,26 @@
-import os
-from dotenv import load_dotenv
-from redis import Redis
-from rq import Queue
+from typing import Callable, Any, Dict, Optional
+from uuid import uuid4
+from fastapi import BackgroundTasks
 
-load_dotenv()
+# Simple in-memory job store for background tasks
+_jobs: Dict[str, Dict[str, Optional[Any]]] = {}
 
-REDIS_URL = os.getenv("REDIS_URL") or os.getenv("FASTAPI_QUEUE_URL") or "redis://localhost:6379/0"
+def _run_and_store(job_id: str, func: Callable[[Any], Any], arg: Any) -> None:
+    try:
+        _jobs[job_id]["status"] = "running"
+        result = func(arg)
+        _jobs[job_id]["result"] = result
+        _jobs[job_id]["status"] = "finished"
+    except Exception as e:  # pragma: no cover
+        _jobs[job_id]["error"] = str(e)
+        _jobs[job_id]["status"] = "failed"
 
-def _redis_from_url(url: str) -> Redis:
-    # Simple parser that lets Redis() handle most defaults
-    return Redis.from_url(url)
+def enqueue(background_tasks: BackgroundTasks, func: Callable[[Any], Any], arg: Any) -> str:
+    job_id = str(uuid4())
+    _jobs[job_id] = {"status": "queued", "result": None, "error": None}
+    background_tasks.add_task(_run_and_store, job_id, func, arg)
+    return job_id
 
-redis_conn: Redis = _redis_from_url(REDIS_URL)
-queue: Queue = Queue("ocr_tasks", connection=redis_conn)
-
-def enqueue(func, *args, **kwargs):
-    return queue.enqueue(func, *args, **kwargs)
+def get_job(job_id: str) -> Optional[Dict[str, Optional[Any]]]:
+    return _jobs.get(job_id)
 

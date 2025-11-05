@@ -1,5 +1,5 @@
-# GPU base with Paddle 3.x
-FROM paddlepaddle/paddle:3.2.0-gpu-cuda12.6-cudnn8
+# Official PaddleOCR-VL base (CCR registry)
+FROM ccr-2vdh3abv-pub.cnc.bj.baidubce.com/paddlepaddle/paddleocr-vl:latest
 
 WORKDIR /app
 
@@ -18,6 +18,6 @@ pipe.predict(np.zeros((10,10,3), dtype='uint8'))
 print('PaddleOCR-VL warm-up complete')
 PY
 
-EXPOSE 80
+EXPOSE 8080
 
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "80"]
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8080"]

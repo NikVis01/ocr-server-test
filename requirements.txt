@@ -3,6 +3,3 @@ uvicorn[standard]
 pillow
 requests
 paddleocr[doc-parser]
-redis
-rq
-python-dotenv
