@@ -13,10 +13,10 @@ COPY ocr_server.py /app/ocr_server.py
 # Pre-download PaddleOCR models by running a tiny warm-up
 RUN python - <<'PY'
 import numpy as np
-from paddleocr import PaddleOCR
-ocr = PaddleOCR(use_angle_cls=True, lang='en')
-ocr.ocr(np.zeros((10,10,3), dtype='uint8'), cls=True)
-print('Model warm-up complete')
+from paddleocr import PaddleOCRVL
+pipe = PaddleOCRVL()
+pipe.predict(np.zeros((10,10,3), dtype='uint8'))
+print('PaddleOCR-VL warm-up complete')
 PY
 
 # Expose port for service

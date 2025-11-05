@@ -3,16 +3,20 @@ from fastapi.responses import JSONResponse
 import numpy as np
 import cv2
 import requests
-from paddleocr import PaddleOCR
+from paddleocr import PaddleOCRVL
 import base64
+import logging
 
-app = FastAPI(title="PaddleOCR Service")
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger("ocr-server")
+
+app = FastAPI(title="PaddleOCR-VL Service")
 
 @app.get("/health")
 def health():
     return {"status": "ok"}
 
-pipeline = PaddleOCR(use_angle_cls=True, lang='en')
+pipeline = PaddleOCRVL()
 
 @app.post("/infer/")
 async def infer(
@@ -45,39 +49,54 @@ async def infer(
     img = cv2.imdecode(arr, cv2.IMREAD_COLOR)
     if img is None:
         raise HTTPException(status_code=400, detail="Could not decode image bytes")
-    # PaddleOCR expects BGR; keep as-is
+    # Keep BGR; log shape
+    try:
+        logger.info("Decoded image shape: %s", None if img is None else tuple(img.shape))
+    except Exception:
+        pass
 
     # inference
     try:
-        output = pipeline.ocr(img)
+        output = pipeline.predict(img)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Inference failed: {e}")
 
     # format results
     results = []
-    # output is list per image; each item is typically [bbox, (text, score)]
-    for lines in output:
-        if not lines:
-            continue
-        for item in lines:
-            if not item or len(item) < 2:
-                continue
-            bbox = item[0]
-            info = item[1]
-            text, score = None, None
-            if isinstance(info, (list, tuple)) and len(info) >= 2:
-                text = info[0]
-                try:
-                    score = float(info[1])
-                except Exception:
-                    score = None
-            elif isinstance(info, str):
-                text = info
+    # Log raw output preview
+    try:
+        logger.info("Raw output count: %d", 0 if output is None else len(output))
+        logger.info("Raw output preview: %s", output if output is None else output[:3])
+    except Exception:
+        pass
+
+    # Each item is a result object; extract common fields robustly
+    for res in (output or []):
+        try:
+            text = getattr(res, "text", None)
+            confidence = getattr(res, "confidence", None)
+            bbox = getattr(res, "bbox", None)
+
+            # Extra logging via optional helper
+            try:
+                if hasattr(res, "print"):
+                    logger.info("Result.print():")
+                    res.print()
+            except Exception:
+                pass
+
+            try:
+                logger.info("Result snapshot: text=%s, conf=%s, bbox=%s", text, confidence, bbox)
+            except Exception:
+                pass
+
             results.append({
                 "text": text,
-                "confidence": score,
+                "confidence": confidence,
                 "bbox": bbox
             })
+        except Exception:
+            continue
 
     return JSONResponse(content={"results": results})
 
