@@ -37,6 +37,14 @@ curl -s -X POST http://localhost:8080/infer/ \
   -F "url=https://example.com/image.jpg" | jq .
 ```
 
+- Send base64 (JSON):
+```bash
+BASE64=$(base64 -w0 /path/to/image.jpg)
+curl -s -H 'Content-Type: application/json' \
+  -d "{\"b64\":\"$BASE64\"}" \
+  http://localhost:8080/infer/ | jq .
+```
+
 ### Local (no Docker)
 ```bash
 python -m venv .venv
@@ -44,6 +52,24 @@ source .venv/bin/activate
 pip install -U pip
 pip install -r requirements.txt
 uvicorn ocr_server:app --host 0.0.0.0 --port 8080
+```
+
+### Python client (file or base64)
+```python
+import base64, requests
+
+BASE = "http://localhost:8080"
+
+# file upload
+with open("/path/to/image.jpg", "rb") as f:
+    r = requests.post(f"{BASE}/infer/", files={"file": ("image.jpg", f, "image/jpeg")})
+print(r.json())
+
+# base64
+with open("/path/to/image.jpg", "rb") as f:
+    b64 = base64.b64encode(f.read()).decode()
+r = requests.post(f"{BASE}/infer/", json={"b64": b64})
+print(r.json())
 ```
 
 ### Endpoints

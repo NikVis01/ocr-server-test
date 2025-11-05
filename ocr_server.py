@@ -1,9 +1,10 @@
-from fastapi import FastAPI, File, UploadFile, HTTPException, Form
+from fastapi import FastAPI, File, UploadFile, HTTPException, Form, Body
 from fastapi.responses import JSONResponse
 import numpy as np
 import cv2
 import requests
 from paddleocr import PaddleOCR
+import base64
 
 app = FastAPI(title="PaddleOCR Service")
 
@@ -16,21 +17,28 @@ pipeline = PaddleOCR(use_angle_cls=True, lang='en')
 @app.post("/infer/")
 async def infer(
     file: UploadFile = File(None),
-    url: str = Form(None)
+    url: str = Form(None),
+    b64: str = Body(None)
 ):
-    if not file and not url:
-        raise HTTPException(status_code=400, detail="Either file upload or url must be provided")
+    if not file and not url and not b64:
+        raise HTTPException(status_code=400, detail="Provide one of: file, url, or JSON b64")
 
     # get image bytes
     if file:
         contents = await file.read()
-    else:
+    elif url:
         try:
             resp = requests.get(url, timeout=10)
             resp.raise_for_status()
             contents = resp.content
         except Exception as e:
             raise HTTPException(status_code=400, detail=f"Failed to download image from url: {e}")
+    else:
+        try:
+            payload = b64.split(',')[-1] if b64 else ''
+            contents = base64.b64decode(payload, validate=False)
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=f"Invalid base64 payload: {e}")
 
     # decode image
     arr = np.frombuffer(contents, dtype=np.uint8)
@@ -47,14 +55,24 @@ async def infer(
 
     # format results
     results = []
-    # output is list per image; each item is list of (bbox, (text, score))
+    # output is list per image; each item is typically [bbox, (text, score)]
     for lines in output:
         if not lines:
             continue
         for item in lines:
+            if not item or len(item) < 2:
+                continue
             bbox = item[0]
-            text = item[1][0]
-            score = float(item[1][1])
+            info = item[1]
+            text, score = None, None
+            if isinstance(info, (list, tuple)) and len(info) >= 2:
+                text = info[0]
+                try:
+                    score = float(info[1])
+                except Exception:
+                    score = None
+            elif isinstance(info, str):
+                text = info
             results.append({
                 "text": text,
                 "confidence": score,
