@@ -3,6 +3,6 @@ uvicorn[standard]
 pillow
 requests
 paddleocr[doc-parser]
-fastapi-queue
 redis
+rq
 python-dotenv
