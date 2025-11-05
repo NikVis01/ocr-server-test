@@ -49,7 +49,7 @@ async def infer(
 
     # inference
     try:
-        output = pipeline.ocr(img, cls=True)
+        output = pipeline.ocr(img)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Inference failed: {e}")
 
