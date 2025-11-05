@@ -1,8 +1,8 @@
 fastapi
 uvicorn[standard]
-numpy
-opencv-python
+pillow
 requests
-python-multipart
-paddlepaddle
-paddleocr
+paddleocr[doc-parser]
+fastapi-queue
+redis
+python-dotenv

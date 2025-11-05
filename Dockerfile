@@ -1,16 +1,15 @@
-# Use your base image (official PaddleOCR-VL image)
-FROM ccr-2vdh3abv-pub.cnc.bj.baidubce.com/paddlepaddle/paddleocr-vl:latest
+# GPU base with Paddle 3.x
+FROM paddlepaddle/paddle:3.2.0-gpu-cuda12.6-cudnn8
 
-# Set working dir
 WORKDIR /app
 
 COPY requirements.txt /app/requirements.txt
 RUN pip install --no-cache-dir -r /app/requirements.txt
 
-# Copy your FastAPI server file
-COPY ocr_server.py /app/ocr_server.py
+# Copy app sources
+COPY app/ /app/app/
 
-# Pre-download PaddleOCR models by running a tiny warm-up
+# Pre-download PaddleOCR-VL models by running a tiny warm-up
 RUN python - <<'PY'
 import numpy as np
 from paddleocr import PaddleOCRVL
@@ -19,8 +18,6 @@ pipe.predict(np.zeros((10,10,3), dtype='uint8'))
 print('PaddleOCR-VL warm-up complete')
 PY
 
-# Expose port for service
-EXPOSE 8080
+EXPOSE 80
 
-# Command to run when container starts
-CMD ["uvicorn", "ocr_server:app", "--host", "0.0.0.0", "--port", "80"]
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "80"]
