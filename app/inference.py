@@ -2,6 +2,7 @@ from typing import Dict, Any
 import logging
 import time
 from paddleocr import PaddleOCRVL
+import os
 from .utils import download_pdf_to_tmp
 import paddle
 
@@ -17,9 +18,10 @@ def run_paddle_ocr_vl_pdf(pdf_url: str) -> Dict[str, Any]:
     t0 = time.perf_counter()
     _log.info("download pdf", extra={"pdf_url": pdf_url})
     local_pdf = download_pdf_to_tmp(pdf_url)
-    # Prefer GPU if available
-    pipeline = PaddleOCRVL()
-    _log.info("pipeline init (native backend)")
+    # Use vLLM backend for VL recognition
+    vl_url = os.getenv("VL_SERVER_URL", "http://127.0.0.1:8118/v1")
+    pipeline = PaddleOCRVL(vl_rec_backend="vllm-server", vl_rec_server_url=vl_url)
+    _log.info("pipeline init (vllm backend)", extra={"vl_server": vl_url})
     output = pipeline.predict(input=local_pdf)
     _log.info("predict done", extra={"elapsed_s": round(time.perf_counter()-t0, 3), "pages": len(output or [])})
 

@@ -12,17 +12,24 @@ FastAPI service for PaddleOCR-VL. Accepts a PDF URL; exposes 8080 (mapped to hos
 ./build.sh
 ```
 
-2) Run (GCP: map host 80 -> container 8080)
+2) Start vLLM (separate container; requires CUDA >= 12.6)
+```bash
+docker run -it --rm --gpus all --network host \
+  ccr-2vdh3abv-pub.cnc.bj.baidubce.com/paddlepaddle/paddleocr-genai-vllm-server:latest \
+  paddleocr genai_server --model_name PaddleOCR-VL-0.9B --host 0.0.0.0 --port 8118 --backend vllm
+```
+
+3) Run wrapper (GCP: map host 80 -> container 8080)
 ```bash
 ./run.sh
 ```
 
-3) Health check
+4) Health check
 ```bash
 curl -s http://<server-ip>/health
 ```
 
-4) Inference (PDF URL)
+5) Inference (PDF URL)
 ```bash
 curl -s -X POST http://<server-ip>/infer \
   -H 'Content-Type: application/json' \
