@@ -6,6 +6,21 @@ WORKDIR /app
 COPY requirements.txt /app/requirements.txt
 RUN pip install --no-cache-dir -r /app/requirements.txt
 
+# Ensure Paddle (GPU, CUDA 12.6+) is available in the runtime image
+ARG PADDLE_GPU_VERSION=3.2.1
+ENV PADDLE_PDX_MODEL_SOURCE=BOS
+RUN pip install --no-cache-dir \
+    paddlepaddle-gpu==${PADDLE_GPU_VERSION} \
+    -i https://www.paddlepaddle.org.cn/packages/stable/cu126/
+
+# Sanity check versions
+RUN python - <<'PY'
+import paddle
+import paddlex
+print('paddle', paddle.__version__)
+print('paddlex', getattr(paddlex, '__version__', 'unknown'))
+PY
+
 # Copy app sources
 COPY app/ /app/app/
 
