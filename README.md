@@ -1,13 +1,13 @@
 PaddleOCR-VL Service
 
-FastAPI service for PaddleOCR-VL. Accepts a PDF URL; exposes 8080; GPU-ready. Uses FastAPI BackgroundTasks for lightweight in-process queuing with job polling endpoints. The service configures PaddleOCR-VL to use a vLLM server for VL recognition per `how-to-do-it.md`.
+FastAPI service for PaddleOCR-VL. Accepts a PDF URL; exposes 8080 (mapped to host 80 on GCP); GPU REQUIRED.
 
 ### Requirements
 - Docker (recommended) — `setup.sh` installs Docker on Ubuntu
 - Optional: NVIDIA GPU + drivers + nvidia-container-runtime (use a GPU Paddle base if needed)
 
 ### Quickstart (Docker)
-1) Build (GPU wheel)
+1) Build
 ```bash
 ./build.sh
 ```
@@ -15,12 +15,6 @@ FastAPI service for PaddleOCR-VL. Accepts a PDF URL; exposes 8080; GPU-ready. Us
 2) Run (GCP: map host 80 -> container 8080)
 ```bash
 ./run.sh
-# Equivalent:
-# docker run --rm --gpus all \
-#   --add-host=host.docker.internal:host-gateway \
-#   -e USE_GPU=true \
-#   -e VL_SERVER_URL=http://host.docker.internal:8118/v1 \
-#   -p 80:8080 paddleocr-vl-service:latest
 ```
 
 3) Health check

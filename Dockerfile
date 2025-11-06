@@ -6,6 +6,11 @@ WORKDIR /app
 COPY requirements.txt /app/requirements.txt
 RUN pip install --no-cache-dir -r /app/requirements.txt
 
+# Ensure Paddle (GPU) is present; override via build args if needed
+ARG PADDLE_PACKAGE=paddlepaddle-gpu==2.6.1
+ARG PADDLE_INDEX=https://pypi.tuna.tsinghua.edu.cn/simple
+RUN pip install --no-cache-dir ${PADDLE_PACKAGE} -i ${PADDLE_INDEX}
+
 # Copy app sources
 COPY app/ /app/app/
 
