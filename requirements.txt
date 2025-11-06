@@ -3,3 +3,4 @@ uvicorn[standard]
 pillow
 requests
 paddleocr[doc-parser]
+pyyaml

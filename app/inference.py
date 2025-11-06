@@ -4,10 +4,29 @@ import logging
 import time
 from paddleocr import PaddleOCRVL
 from .utils import download_pdf_to_tmp
+import yaml
 
 _vl_server = os.getenv("VL_SERVER_URL", "http://127.0.0.1:8118/v1")
 _use_gpu = os.getenv("USE_GPU", "true").lower() in ("1", "true", "yes")
 _log = logging.getLogger("paddleocr_vl.infer")
+
+# Optional: read pipeline YAML to override vLLM server URL
+_pipeline_yaml = os.getenv("PIPELINE_YAML")
+if _pipeline_yaml and os.path.exists(_pipeline_yaml):
+    try:
+        with open(_pipeline_yaml, "r", encoding="utf-8") as f:
+            cfg = yaml.safe_load(f) or {}
+        server = (
+            cfg.get("SubModules", {})
+               .get("VLRecognition", {})
+               .get("genai_config", {})
+               .get("server_url")
+        )
+        if server:
+            _vl_server = server
+            _log.info("VL server from YAML", extra={"vl_server": _vl_server})
+    except Exception as e:
+        _log.warning("Failed to read PIPELINE_YAML", extra={"error": str(e)})
 
 def run_paddle_ocr_vl_pdf(pdf_url: str) -> Dict[str, Any]:
     t0 = time.perf_counter()
