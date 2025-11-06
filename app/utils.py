@@ -1,17 +1,13 @@
-import base64
-import io
+import os
+import tempfile
 import requests
-from PIL import Image
-import numpy as np
 
-def load_image(source: str) -> np.ndarray:
-    if source.startswith("http://") or source.startswith("https://"):
-        resp = requests.get(source, timeout=15)
-        resp.raise_for_status()
-        img = Image.open(io.BytesIO(resp.content)).convert("RGB")
-        return np.array(img)
-    payload = source.split(',')[-1]
-    img_bytes = base64.b64decode(payload)
-    img = Image.open(io.BytesIO(img_bytes)).convert("RGB")
-    return np.array(img)
+def download_pdf_to_tmp(url: str) -> str:
+    resp = requests.get(url, timeout=60)
+    resp.raise_for_status()
+    suffix = ".pdf"
+    fd, path = tempfile.mkstemp(suffix=suffix)
+    with os.fdopen(fd, "wb") as f:
+        f.write(resp.content)
+    return path
 

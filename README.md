@@ -1,6 +1,6 @@
 PaddleOCR-VL Service
 
-FastAPI + fastapi-queue service for PaddleOCR-VL. Accepts base64 or URL; exposes 8080; GPU-ready.
+FastAPI service for PaddleOCR-VL. Accepts a PDF URL; exposes 8080; GPU-ready. Uses FastAPI BackgroundTasks for lightweight in-process queuing with job polling endpoints. The service configures PaddleOCR-VL to use a vLLM server for VL recognition per `how-to-do-it.md`.
 
 ### Requirements
 - Docker (recommended) — `setup.sh` installs Docker on Ubuntu
@@ -14,30 +14,28 @@ FastAPI + fastapi-queue service for PaddleOCR-VL. Accepts base64 or URL; exposes
 
 2) Run
 ```bash
-docker run --rm -p 80:80 paddleocr-vl-service:latest
+docker run --rm -p 8080:8080 paddleocr-vl-service:latest
 # If host has NVIDIA runtime and you want GPU: add --gpus all
-# docker run --rm --gpus all -p 80:80 paddleocr-vl-service:latest
+# docker run --rm --gpus all -p 8080:8080 paddleocr-vl-service:latest
 ```
 
 3) Health check
 ```bash
-curl -s http://localhost:80/health
+curl -s http://localhost:8080/health
 ```
 
 4) Inference
-- URL (JSON):
+- PDF URL (JSON):
 ```bash
-curl -s -X POST http://localhost:80/infer \
+curl -s -X POST http://localhost:8080/infer \
   -H 'Content-Type: application/json' \
-  -d '{"image_url":"https://example.com/image.jpg"}' | jq .
+  -d '{"pdf_url":"https://example.com/sample.pdf"}' | jq .
 ```
 
-- Base64 (JSON):
+Then poll the job status and result:
 ```bash
-BASE64=$(base64 -w0 /path/to/image.jpg)
-curl -s -X POST http://localhost:80/infer \
-  -H 'Content-Type: application/json' \
-  -d "{\"image_base64\":\"$BASE64\"}" | jq .
+curl -s http://localhost:8080/jobs/<job_id>
+curl -s http://localhost:8080/jobs/<job_id>/result | jq .
 ```
 
 ### Local (no Docker)
@@ -46,29 +44,27 @@ python -m venv .venv
 source .venv/bin/activate
 pip install -U pip
 pip install -r requirements.txt
-uvicorn app.main:app --host 0.0.0.0 --port 80
+uvicorn app.main:app --host 0.0.0.0 --port 8080
 ```
 
-### Python client (URL or base64)
+### Python client (PDF URL)
 ```python
-import base64, requests
+import requests
 
-BASE = "http://localhost:80"
+BASE = "http://localhost:8080"
 
-# url
-r = requests.post(f"{BASE}/infer", json={"image_url": "https://example.com/image.jpg"})
-print(r.json())
-
-# base64
-with open("/path/to/image.jpg", "rb") as f:
-    b64 = base64.b64encode(f.read()).decode()
-r = requests.post(f"{BASE}/infer", json={"image_base64": b64})
-print(r.json())
+# submit pdf url
+r = requests.post(f"{BASE}/infer", json={"pdf_url": "https://example.com/sample.pdf"})
+job = r.json()["job_id"]
+print(job)
+print(requests.get(f"{BASE}/jobs/{job}/result").json())
 ```
 
 ### Endpoints
 - `GET /health` → `{ "status": "ok" }`
-- `POST /infer` → returns `{ job_id, status }`; queue configured via `FASTAPI_QUEUE_URL`
+- `POST /infer` → body `{ pdf_url }`; returns `{ job_id, status }`
+- `GET /jobs/{job_id}` → `{ job_id, status }`
+- `GET /jobs/{job_id}/result` → `{ job_id, status, result }` when finished (result contains `markdown` and base64 `images`)
 
 ### Notes
 - The server initializes the PaddleOCR pipeline at startup; first request may be slower due to model load.
