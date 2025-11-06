@@ -7,35 +7,38 @@ FastAPI service for PaddleOCR-VL. Accepts a PDF URL; exposes 8080; GPU-ready. Us
 - Optional: NVIDIA GPU + drivers + nvidia-container-runtime (use a GPU Paddle base if needed)
 
 ### Quickstart (Docker)
-1) Build
+1) Build (GPU wheel)
 ```bash
 ./build.sh
 ```
 
-2) Run
+2) Run (GCP: map host 80 -> container 8080)
 ```bash
-docker run --rm -p 8080:8080 paddleocr-vl-service:latest
-# If host has NVIDIA runtime and you want GPU: add --gpus all
-# docker run --rm --gpus all -p 8080:8080 paddleocr-vl-service:latest
+./run.sh
+# Equivalent:
+# docker run --rm --gpus all \
+#   --add-host=host.docker.internal:host-gateway \
+#   -e USE_GPU=true \
+#   -e VL_SERVER_URL=http://host.docker.internal:8118/v1 \
+#   -p 80:8080 paddleocr-vl-service:latest
 ```
 
 3) Health check
 ```bash
-curl -s http://localhost:8080/health
+curl -s http://<server-ip>/health
 ```
 
-4) Inference
-- PDF URL (JSON):
+4) Inference (PDF URL)
 ```bash
-curl -s -X POST http://localhost:8080/infer \
+curl -s -X POST http://<server-ip>/infer \
   -H 'Content-Type: application/json' \
   -d '{"pdf_url":"https://example.com/sample.pdf"}' | jq .
 ```
 
 Then poll the job status and result:
 ```bash
-curl -s http://localhost:8080/jobs/<job_id>
-curl -s http://localhost:8080/jobs/<job_id>/result | jq .
+curl -s http://<server-ip>/jobs/<job_id>
+curl -s http://<server-ip>/jobs/<job_id>/result | jq .
 ```
 
 ### Local (no Docker)
