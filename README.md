@@ -3,8 +3,14 @@ PaddleOCR-VL Service
 FastAPI service for PaddleOCR-VL. Accepts a PDF URL; exposes 8080 (mapped to host 80 on GCP); GPU REQUIRED.
 
 ### Requirements
-- Docker (recommended) — `setup.sh` installs Docker on Ubuntu
-- Optional: NVIDIA GPU + drivers + nvidia-container-runtime (use a GPU Paddle base if needed)
+- Docker (recommended)
+- Mandatory for GPU deploy: NVIDIA GPU + drivers + nvidia-container-runtime (use a GPU Paddle base if needed)
+
+Here's how I got it to work:
+I: Deploy on an Ubuntu Accelerated 22.04 507 x86 image. This is the only one that works. It says that it's supposed to have nvidia container runtime and tools installed but that is a lie. 
+II: install docker and basic libs.
+III: Go to https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html and following along with the right ubuntu version.
+IIII: Follow along with the rest of this guide.
 
 ### Quickstart (Docker)
 1) Build
@@ -12,12 +18,13 @@ FastAPI service for PaddleOCR-VL. Accepts a PDF URL; exposes 8080 (mapped to hos
 ./build.sh
 ```
 
-2) Start vLLM (separate container; requires CUDA >= 12.6)
+2) Start PaddleOCR (separate container; requires CUDA >= 12.6)
 ```bash
 docker run -it --rm --gpus all --network host \
   ccr-2vdh3abv-pub.cnc.bj.baidubce.com/paddlepaddle/paddleocr-genai-vllm-server:latest \
   paddleocr genai_server --model_name PaddleOCR-VL-0.9B --host 0.0.0.0 --port 8118 --backend vllm
 ```
+- This may take a moment but will expose 8118 (standard) then you can route to it thru the FastAPI service.
 
 3) Run wrapper (GCP: map host 80 -> container 8080)
 ```bash
@@ -104,7 +111,14 @@ print(requests.get(f"{BASE}/jobs/{job}/result").json())
 
 ### Notes
 - The server initializes the PaddleOCR pipeline at startup; first request may be slower due to model load.
-- If you need GPU acceleration, use a GPU Paddle base image and ensure NVIDIA drivers and runtime are configured, then run with `--gpus all`.
+- Use a GPU Paddle base image and ensure NVIDIA drivers and runtime are configured, then run with `--gpus all`.
 
-How to get drivers:
-https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html
+
+test simply with:
+```bash
+curl -s http://localhost/health
+
+JOB=$(curl -s -X POST http://localhost/infer -H 'Content-Type: application/json' \
+  -d '{"pdf_url":"https://ontheline.trincoll.edu/images/bookdown/sample-local-pdf.pdf"}' | jq -r .job_id)
+curl -s http://localhost/jobs/$JOB/result | jq .
+```
