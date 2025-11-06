@@ -4,15 +4,8 @@ import time
 from paddleocr import PaddleOCRVL
 import os
 from .utils import download_pdf_to_tmp
-import paddle
 
 _log = logging.getLogger("paddleocr_vl.infer")
-
-# Enforce GPU usage (fail fast if not available)
-try:
-    paddle.set_device("gpu")
-except Exception as e:
-    raise RuntimeError(f"GPU device required but not available: {e}")
 
 def run_paddle_ocr_vl_pdf(pdf_url: str) -> Dict[str, Any]:
     t0 = time.perf_counter()
