@@ -26,6 +26,7 @@ docker run -it --rm --gpus all --network host \
 ```
 - This may take a moment but will expose 8118 (standard) then you can route to it thru the FastAPI service.
 
+3) Set up cache
 ### Redis setup (queue + status + webhooks)
 - Quick, isolated Docker setup:
 ```bash
@@ -36,7 +37,9 @@ export REDIS_PASSWORD=$(openssl rand -base64 32)
 docker run -d --name redis --network ocr-net -v redis-data:/data \
   redis:7-alpine redis-server --appendonly yes --protected-mode yes \
   --bind 0.0.0.0 --requirepass "$REDIS_PASSWORD"
-
+```
+4. Start wrapper
+```bash
 # Run wrapper on same network
 docker run --rm --gpus all --network ocr-net \
   -e REDIS_URL="redis://:${REDIS_PASSWORD}@redis:6379/0" \

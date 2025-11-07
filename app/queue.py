@@ -5,7 +5,7 @@ from redis import Redis
 
 _log = logging.getLogger("paddleocr_vl.queue")
 
-REDIS_URL = os.getenv("REDIS_URL") or os.getenv("FASTAPI_QUEUE_URL") or "redis://localhost:6379/0"
+REDIS_URL = os.getenv("REDIS_URL") or os.getenv("FASTAPI_QUEUE_URL") or "redis://:demo123@127.0.0.1:6379/0"
 redis: Redis = Redis.from_url(REDIS_URL)
 _queue_key = os.getenv("QUEUE_KEY", "ocr_jobs")
 
