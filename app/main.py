@@ -1,23 +1,24 @@
-from fastapi import FastAPI, HTTPException, BackgroundTasks
-from .queue import enqueue, get_job
-from .inference import run_paddle_ocr_vl_pdf
+from fastapi import FastAPI, HTTPException
+from .queue import enqueue_job, get_job, worker
 
 app = FastAPI(title="PaddleOCR-VL Service")
 
 @app.on_event("startup")
 async def startup_event():
-    pass
+    worker.start()
 
 @app.get("/health")
 def health():
     return {"status": "probably fine lol"}
 
 @app.post("/infer")
-async def infer(request: dict, background_tasks: BackgroundTasks):
+async def infer(request: dict):
     pdf_url = request.get("pdf_url")
+    callback_url = request.get("callback_url")
+    idem_key = request.get("idempotency_key")
     if not pdf_url:
         raise HTTPException(status_code=400, detail="Provide pdf_url")
-    job_id = enqueue(background_tasks, run_paddle_ocr_vl_pdf, pdf_url)
+    job_id = enqueue_job(pdf_url, callback_url, idem_key)
     return {"job_id": job_id, "status": "queued"}
 
 @app.get("/jobs/{job_id}")

@@ -43,6 +43,29 @@ curl -s -X POST http://<server-ip>/infer \
   -d '{"pdf_url":"https://example.com/sample.pdf"}' | jq .
 ```
 
+### Redis setup (queue + status + webhooks)
+- Quick, isolated Docker setup:
+```bash
+docker network create ocr-net
+export REDIS_PASSWORD=$(openssl rand -base64 32)
+
+# Private Redis (no published port)
+docker run -d --name redis --network ocr-net -v redis-data:/data \
+  redis:7-alpine redis-server --appendonly yes --protected-mode yes \
+  --bind 0.0.0.0 --requirepass "$REDIS_PASSWORD"
+
+# Run wrapper on same network
+docker run --rm --gpus all --network ocr-net \
+  -e REDIS_URL="redis://:${REDIS_PASSWORD}@redis:6379/0" \
+  -e VL_SERVER_URL=http://host.docker.internal:8118/v1 \
+  -p 80:8080 paddleocr-vl-service:latest
+```
+
+- The same `idempotency_key` ensures we don’t double‑process the same PDF. The wrapper dedupes and returns the original job. To skip this just don't send the key or send a new uuid each request.
+  - Optional submit body fields:
+    - `callback_url`: wrapper POSTs `{job_id,status,result}` when done
+    - `idempotency_key`: stable identifier for the document
+
 ### Initialization and Packaging Notes
 - Image base: `ccr-2vdh3abv-pub.cnc.bj.baidubce.com/paddlepaddle/paddleocr-vl:latest` (includes PaddleOCR‑VL and CUDA runtime).
 - During build we install Paddle GPU wheel (CUDA 12.6) inside the image:
