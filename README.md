@@ -26,14 +26,14 @@ docker run -it --rm --gpus all --network host \
 ```
 - This may take a moment but will expose 8118 (standard) then you can route to it thru the FastAPI service.
 
-3) Run wrapper (single-container mode ships with Redis inside)
+3) Run wrapper (no Redis required by default)
 ```bash
-REDIS_PASSWORD=demo123 ./run.sh
+./run.sh
 ```
 
-### Redis setup (queue + status + webhooks)
-- Default: Redis runs inside the wrapper container, bound to 127.0.0.1 with password `REDIS_PASSWORD` (demo only). No extra setup needed.
-- External Redis (optional):
+### Redis setup (optional)
+- Default: No Redis needed. The service uses an in‑memory queue and worker thread. Suitable for single instance/dev.
+- External Redis (optional for persistence/multi‑instance):
 ```bash
 docker network create ocr-net
 export REDIS_PASSWORD=$(openssl rand -base64 32)
