@@ -1,7 +1,7 @@
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse
 import os
-import aioredis
+import redis.asyncio as aioredis
 from fastapi_queue import DistributedTaskApplyManager
 from .queue import enqueue_job, get_job, start_worker
 

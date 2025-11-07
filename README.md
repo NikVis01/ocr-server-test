@@ -26,23 +26,6 @@ docker run -it --rm --gpus all --network host \
 ```
 - This may take a moment but will expose 8118 (standard) then you can route to it thru the FastAPI service.
 
-3) Run wrapper (GCP: map host 80 -> container 8080)
-```bash
-./run.sh
-```
-
-4) Health check
-```bash
-curl -s http://<server-ip>/health
-```
-
-5) Inference (PDF URL)
-```bash
-curl -s -X POST http://<server-ip>/infer \
-  -H 'Content-Type: application/json' \
-  -d '{"pdf_url":"https://example.com/sample.pdf"}' | jq .
-```
-
 ### Redis setup (queue + status + webhooks)
 - Quick, isolated Docker setup:
 ```bash
@@ -59,6 +42,18 @@ docker run --rm --gpus all --network ocr-net \
   -e REDIS_URL="redis://:${REDIS_PASSWORD}@redis:6379/0" \
   -e VL_SERVER_URL=http://host.docker.internal:8118/v1 \
   -p 80:8080 paddleocr-vl-service:latest
+```
+
+3) Health check
+```bash
+curl -s http://<server-ip>/health
+```
+
+4) Inference (PDF URL)
+```bash
+curl -s -X POST http://<server-ip>/infer \
+  -H 'Content-Type: application/json' \
+  -d '{"pdf_url":"https://example.com/sample.pdf"}' | jq .
 ```
 
 - The same `idempotency_key` ensures we don’t double‑process the same PDF. The wrapper dedupes and returns the original job. To skip this just don't send the key or send a new uuid each request.
