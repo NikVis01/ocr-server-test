@@ -35,12 +35,15 @@ PY
 
 # Install Redis server for single-container deployment
 USER root
-RUN apt-get update && apt-get install -y --no-install-recommends redis-server && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y --no-install-recommends redis-server redis-tools && rm -rf /var/lib/apt/lists/*
 USER paddleocr
 
 # Default demo password (override in production)
 ENV REDIS_PASSWORD=demo123
 
+COPY entrypoint.sh /app/entrypoint.sh
+RUN chmod +x /app/entrypoint.sh && mkdir -p /data
+
 EXPOSE 8080
 
-CMD ["bash", "-lc", "redis-server --appendonly yes --protected-mode yes --bind 127.0.0.1 --requirepass \"${REDIS_PASSWORD}\" & exec uvicorn app.main:app --host 0.0.0.0 --port 8080"]
+CMD ["/app/entrypoint.sh"]
