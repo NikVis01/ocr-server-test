@@ -34,7 +34,9 @@ print('PaddleOCR-VL warm-up complete')
 PY
 
 # Install Redis server for single-container deployment
+USER root
 RUN apt-get update && apt-get install -y --no-install-recommends redis-server && rm -rf /var/lib/apt/lists/*
+USER paddleocr
 
 # Default demo password (override in production)
 ENV REDIS_PASSWORD=demo123
