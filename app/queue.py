@@ -1,16 +1,12 @@
 from typing import Any, Dict, Optional
 from uuid import uuid4
-import os, json, time, logging, requests
+import os, json, time, logging, requests, threading
 from redis import Redis
-from fastapi_queue import FastAPIQueue
 
 _log = logging.getLogger("paddleocr_vl.queue")
 
-# Exactly per fastapi-queue usage: use Redis backend URL
-REDIS_URL = os.getenv("REDIS_URL") or os.getenv("FASTAPI_QUEUE_URL") or "redis://localhost:6379/0"
+REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
 redis: Redis = Redis.from_url(REDIS_URL)
-queue = FastAPIQueue(backend=REDIS_URL)
-worker = queue.worker()
 _queue_key = os.getenv("QUEUE_KEY", "ocr_jobs")
 
 def _job_key(job_id: str) -> str:
@@ -33,10 +29,11 @@ def _load_job(job_id: str) -> Optional[Dict[str, Any]]:
     return out
 
 def _idempotent_callback(callback_url: str, job_id: str, payload: Dict[str, Any]) -> None:
-    key = f"idemp:cb:{job_id}:{hash(callback_url)}"
-    if not redis.setnx(key, "1"):
+    # best-effort idempotency across instances using Redis
+    cb_key = f"idemp:cb:{job_id}:{hash(callback_url)}"
+    if not redis.setnx(cb_key, "1"):
         return
-    redis.expire(key, 86400)
+    redis.expire(cb_key, 86400)
     try:
         _log.info("callback send", extra={"job_id": job_id, "url": callback_url})
         resp = requests.post(callback_url, json=payload, timeout=15)
@@ -70,13 +67,26 @@ def enqueue_job(pdf_url: str, callback_url: Optional[str], idem_key: Optional[st
     if _load_job(job_id):
         return job_id
     _save_job(job_id, status="queued")
-    payload = {"job_id": job_id, "pdf_url": pdf_url, "callback_url": callback_url}
-    queue.enqueue(_process, payload)
+    payload = json.dumps({"job_id": job_id, "pdf_url": pdf_url, "callback_url": callback_url})
+    redis.rpush(_queue_key, payload)
     return job_id
 
 def get_job(job_id: str) -> Optional[Dict[str, Any]]:
     return _load_job(job_id)
 
 def start_worker():
-    worker.start()
+    def _worker_loop():
+        _log.info("redis worker started", extra={"queue": _queue_key})
+        while True:
+            try:
+                item = redis.blpop(_queue_key, timeout=5)
+                if not item:
+                    continue
+                _, raw = item
+                payload = json.loads(raw)
+                _process(payload)
+            except Exception as e:
+                _log.exception("worker error", extra={"error": str(e)})
+    t = threading.Thread(target=_worker_loop, daemon=True)
+    t.start()
 

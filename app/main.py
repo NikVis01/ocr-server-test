@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from .queue import enqueue_job, get_job, start_worker
 
 app = FastAPI(title="PaddleOCR-VL Service")
@@ -12,7 +12,7 @@ def health():
     return {"status": "probably fine lol"}
 
 @app.post("/infer")
-async def infer(body: dict):
+async def infer(request: Request, body: dict):
     pdf_url = body.get("pdf_url")
     callback_url = body.get("callback_url")
     idem_key = body.get("idempotency_key")

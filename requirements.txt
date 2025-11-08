@@ -2,5 +2,4 @@ fastapi
 uvicorn[standard]
 pillow
 requests
-fastapi-queue
 redis
