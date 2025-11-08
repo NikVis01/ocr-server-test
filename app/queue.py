@@ -38,9 +38,16 @@ def _idempotent_callback(callback_url: str, job_id: str, payload: Dict[str, Any]
         return
     redis.expire(key, 86400)
     try:
-        requests.post(callback_url, json=payload, timeout=15)
+        _log.info("callback send", extra={"job_id": job_id, "url": callback_url})
+        resp = requests.post(callback_url, json=payload, timeout=15)
+        if 200 <= resp.status_code < 300:
+            _log.info("callback ok", extra={"job_id": job_id, "status_code": resp.status_code})
+        else:
+            # include small slice of body for debugging
+            body = (resp.text or "")[:512]
+            _log.warning("callback non-2xx", extra={"job_id": job_id, "status_code": resp.status_code, "body": body})
     except Exception as e:
-        _log.warning("callback failed", extra={"job_id": job_id, "error": str(e)})
+        _log.warning("callback failed", extra={"job_id": job_id, "error": str(e), "url": callback_url})
 
 def _process(payload: Dict[str, Any]):
     from .inference import run_paddle_ocr_vl_pdf
