@@ -8,8 +8,11 @@ FastAPI service for PaddleOCR-VL. Accepts a PDF URL; exposes 8080 (mapped to hos
 
 Here's how I got it to work:
 I: Deploy on an Ubuntu Accelerated 22.04 507 x86 image. This is the only one that works. It says that it's supposed to have nvidia container runtime and tools installed but that is a lie. 
+
 II: install docker and basic libs.
+
 III: Go to https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html and following along with the right ubuntu version.
+
 IIII: Follow along with the rest of this guide.
 
 ### Quickstart (Docker)
@@ -24,33 +27,32 @@ docker run -it --rm --gpus all --network host \
   ccr-2vdh3abv-pub.cnc.bj.baidubce.com/paddlepaddle/paddleocr-genai-vllm-server:latest \
   paddleocr genai_server --model_name PaddleOCR-VL-0.9B --host 0.0.0.0 --port 8118 --backend vllm
 ```
-- This may take a moment but will expose 8118 (standard) then you can route to it thru the FastAPI service.
+- This may take a moment but will expose 8118 (standard) internally then you can route to it thru the FastAPI service.
 
-3) Run wrapper (no Redis required by default)
-```bash
-./run.sh
-```
-
-### Redis setup (optional)
-- Default: No Redis needed. The service uses an in‑memory queue and worker thread. Suitable for single instance/dev.
-- External Redis (optional for persistence/multi‑instance):
+3) Setup Docker Network
+### Docker network & Redis setup
+- Uses redis for caching queued jobs and their status.
 ```bash
 docker network create ocr-net
-export REDIS_PASSWORD=$(openssl rand -base64 32)
-
-# Private Redis (no published port)
-docker run -d --name redis --network ocr-net -v redis-data:/data \
-  redis:7-alpine redis-server --appendonly yes --protected-mode yes \
-  --bind 0.0.0.0 --requirepass "$REDIS_PASSWORD"
 ```
-4. Start wrapper (external Redis case)
+
+4) Redis setup
+```bash
+docker run -d --name redis --network ocr-net redis:7-alpine
+```
+
+5) Start wrapper
 ```bash
 # Run wrapper on same network
+REDIS_URL=${REDIS_URL:-redis://host.docker.internal:6379/0}
+VL_URL=${VL_SERVER_URL:-http://host.docker.internal:8118/v1}
+
 docker run --rm --gpus all --network ocr-net \
-  -e REDIS_URL="redis://:${REDIS_PASSWORD}@redis:6379/0" \
-  -e VL_SERVER_URL=http://host.docker.internal:8118/v1 \
+  -e VL_SERVER_URL="http://vllm:8118/v1" \
+  -e REDIS_URL="redis://redis:6379/0" \
   -p 80:8080 paddleocr-vl-service:latest
 ```
+- Routes to port 80 as this is std for HTTP in GCP, will be changed to 443 when TLS implemented. 
 
 3) Health check
 ```bash
