@@ -1,0 +1,32 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "paddleocr-vl-service"
+version = "0.1.0"
+description = "FastAPI wrapper for PaddleOCR-VL with Redis-backed queue and callback support."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "Lyceum OCR" }]
+dependencies = [
+    "fastapi",
+    "uvicorn[standard]",
+    "pillow",
+    "requests",
+    "redis",
+]
+
+[project.optional-dependencies]
+dev = [
+  "ruff",
+  "black",
+  "pytest",
+  "httpx",
+]
+
+[project.urls]
+Homepage = "https://example.com"
+
+

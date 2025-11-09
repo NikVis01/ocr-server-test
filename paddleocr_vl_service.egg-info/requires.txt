@@ -1,0 +1,11 @@
+fastapi
+uvicorn[standard]
+pillow
+requests
+redis
+
+[dev]
+ruff
+black
+pytest
+httpx
