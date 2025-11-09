@@ -1,16 +1,19 @@
-from typing import Dict, Any, Optional
-from loguru import logger
 import asyncio
-import aioredis
+import os
 import signal
 import sys
-import os
+from typing import Any
+
+import aioredis
 import requests
 from fastapi_queue import QueueWorker
+from loguru import logger
+
 
 # Business logic: PDF inference using our existing module
-def sync_infer(redis, mysql, *, pdf_url: str, callback_url: Optional[str] = None) -> Dict[str, Any]:
+def sync_infer(redis, mysql, *, pdf_url: str, callback_url: str | None = None) -> dict[str, Any]:
     from app.inference import run_paddle_ocr_vl_pdf
+
     result = run_paddle_ocr_vl_pdf(pdf_url)
     if callback_url:
         try:
@@ -18,6 +21,7 @@ def sync_infer(redis, mysql, *, pdf_url: str, callback_url: Optional[str] = None
         except Exception as e:
             logger.warning(f"callback failed: {e}")
     return result
+
 
 route_table = {
     "/infer": sync_infer,
@@ -28,6 +32,7 @@ route_table_maximum_concurrency = {
 }
 
 queueworker = None
+
 
 async def main(pid, logger):
     global queueworker
@@ -54,11 +59,13 @@ async def main(pid, logger):
     await redis.close()
     logger.info(f"Pid: {worker.pid}, shutdown")
 
+
 def sigint_capture(sig, frame):
     if queueworker:
         queueworker.graceful_shutdown(sig, frame)
     else:
         sys.exit(1)
+
 
 if __name__ == "__main__":
     logger.remove()
@@ -69,5 +76,3 @@ if __name__ == "__main__":
         if pid == 0:
             break
     asyncio.run(main(pid, logger))
-
-

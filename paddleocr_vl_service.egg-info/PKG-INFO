@@ -17,6 +17,7 @@ Requires-Dist: ruff; extra == "dev"
 Requires-Dist: black; extra == "dev"
 Requires-Dist: pytest; extra == "dev"
 Requires-Dist: httpx; extra == "dev"
+Requires-Dist: pre-commit; extra == "dev"
 
 PaddleOCR-VL Service
 

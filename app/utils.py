@@ -1,6 +1,8 @@
 import os
 import tempfile
+
 import requests
+
 
 def download_pdf_to_tmp(url: str) -> str:
     resp = requests.get(url, timeout=60)
@@ -10,4 +12,3 @@ def download_pdf_to_tmp(url: str) -> str:
     with os.fdopen(fd, "wb") as f:
         f.write(resp.content)
     return path
-
