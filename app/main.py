@@ -1,8 +1,29 @@
+import logging
+import time
+
 from fastapi import FastAPI, HTTPException, Request
 
 from .queue import enqueue_job, get_job, start_worker
 
 app = FastAPI(title="PaddleOCR-VL Service")
+
+_log = logging.getLogger("paddleocr_vl.api")
+
+
+@app.middleware("http")
+async def _log_http(request: Request, call_next):
+    t0 = time.perf_counter()
+    resp = await call_next(request)
+    _log.info(
+        "http",
+        extra={
+            "method": request.method,
+            "path": request.url.path,
+            "status": resp.status_code,
+            "elapsed_ms": int((time.perf_counter() - t0) * 1000),
+        },
+    )
+    return resp
 
 
 @app.on_event("startup")
@@ -23,6 +44,9 @@ async def infer(request: Request, body: dict):
     if not pdf_url:
         raise HTTPException(status_code=400, detail="Provide pdf_url")
     job_id = enqueue_job(pdf_url, callback_url, idem_key)
+    _log.info(
+        "job queued", extra={"job_id": job_id, "pdf_url": pdf_url, "callback": bool(callback_url)}
+    )
     return {"job_id": job_id, "status": "queued"}
 
 

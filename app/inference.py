@@ -32,7 +32,14 @@ def run_paddle_ocr_vl_pdf(pdf_url: str) -> dict[str, Any]:
         markdown_images.append(md.get("markdown_images", {}))
 
     markdown_texts = pipeline.concatenate_markdown_pages(markdown_list)
-    _log.info("markdown built", extra={"markdown_chars": len(markdown_texts)})
+    # log a short preview to help debugging without spamming logs
+    _log.info(
+        "markdown built",
+        extra={
+            "markdown_chars": len(markdown_texts),
+            "preview": (markdown_texts or "")[:256],
+        },
+    )
 
     images = {}
     for item in markdown_images:

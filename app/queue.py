@@ -74,6 +74,13 @@ def _process(payload: dict[str, Any]):
     _save_job(job_id, status="running", started_at=time.time())
     try:
         result = run_paddle_ocr_vl_pdf(pdf_url)
+        # concise summary for observability
+        summary = {
+            "markdown_chars": len(result.get("markdown") or ""),
+            "images": len(result.get("images") or {}),
+            "preview": (result.get("markdown") or "")[:256],
+        }
+        _log.info("model response", extra={"job_id": job_id, **summary})
         _save_job(job_id, status="finished", result=result, finished_at=time.time())
         if callback_url:
             _idempotent_callback(
