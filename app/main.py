@@ -1,6 +1,8 @@
 import logging
+import os
 import time
 
+import requests
 from fastapi import FastAPI, HTTPException, Request
 
 from .queue import enqueue_job, get_job, start_worker
@@ -10,24 +12,42 @@ app = FastAPI(title="PaddleOCR-VL Service")
 _log = logging.getLogger("paddleocr_vl.api")
 
 
+def _probe_vllm_async():
+    import threading
+
+    def _run():
+        base = os.getenv("VL_SERVER_URL", "http://127.0.0.1:8118/v1").rstrip("/")
+        models_url = f"{base}/models"
+        health_base = base.rsplit("/", 1)[0] if base.endswith(("/v1", "/vl")) else base
+        health_url = f"{health_base}/health"
+        for i in range(3):
+            try:
+                s_models = requests.get(models_url, timeout=3).status_code
+                s_health = requests.get(health_url, timeout=3).status_code
+                _log.info(
+                    f"vllm probes models_status={s_models} health_status={s_health} base={base}"
+                )
+                break
+            except Exception as e:
+                _log.warning(f"vllm probe attempt={i+1} error={e}")
+                time.sleep(1 * (i + 1))
+
+    threading.Thread(target=_run, daemon=True).start()
+
+
 @app.middleware("http")
 async def _log_http(request: Request, call_next):
     t0 = time.perf_counter()
     resp = await call_next(request)
-    _log.info(
-        "http",
-        extra={
-            "method": request.method,
-            "path": request.url.path,
-            "status": resp.status_code,
-            "elapsed_ms": int((time.perf_counter() - t0) * 1000),
-        },
-    )
+    elapsed_ms = int((time.perf_counter() - t0) * 1000)
+    _log.info(f"http {request.method} {request.url.path} {resp.status_code} {elapsed_ms}ms")
     return resp
 
 
 @app.on_event("startup")
 async def startup_event():
+    # quick non-blocking probes to the model server
+    _probe_vllm_async()
     start_worker()
 
 

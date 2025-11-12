@@ -17,11 +17,10 @@ def run_paddle_ocr_vl_pdf(pdf_url: str) -> dict[str, Any]:
     # Use vLLM backend for VL recognition
     vl_url = os.getenv("VL_SERVER_URL", "http://127.0.0.1:8118/v1")
     pipeline = PaddleOCRVL(vl_rec_backend="vllm-server", vl_rec_server_url=vl_url)
-    _log.info("pipeline init (vllm backend)", extra={"vl_server": vl_url})
+    _log.info(f"pipeline init (vllm backend) vl_server={vl_url}")
     output = pipeline.predict(input=local_pdf)
     _log.info(
-        "predict done",
-        extra={"elapsed_s": round(time.perf_counter() - t0, 3), "pages": len(output or [])},
+        f"predict done elapsed_s={round(time.perf_counter() - t0, 3)} pages={len(output or [])}"
     )
 
     markdown_list = []
@@ -33,13 +32,9 @@ def run_paddle_ocr_vl_pdf(pdf_url: str) -> dict[str, Any]:
 
     markdown_texts = pipeline.concatenate_markdown_pages(markdown_list)
     # log a short preview to help debugging without spamming logs
-    _log.info(
-        "markdown built",
-        extra={
-            "markdown_chars": len(markdown_texts),
-            "preview": (markdown_texts or "")[:256],
-        },
-    )
+    md_chars = len(markdown_texts)
+    md_preview = (markdown_texts or "")[:64]
+    _log.info(f"markdown built chars={md_chars} preview={md_preview!r}")
 
     images = {}
     for item in markdown_images:
@@ -53,5 +48,5 @@ def run_paddle_ocr_vl_pdf(pdf_url: str) -> dict[str, Any]:
             buf = io.BytesIO()
             image.save(buf, format="PNG")
             images[path] = base64.b64encode(buf.getvalue()).decode()
-    _log.info("images encoded", extra={"count": len(images)})
+    _log.info(f"images encoded count={len(images)}")
     return {"markdown": markdown_texts, "images": images}
