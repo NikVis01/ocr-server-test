@@ -36,19 +36,18 @@ docker run -it --rm --gpus all --network host \
 docker network create ocr-net
 ```
 
-4) Redis setup
+4) Redis & docker network setup
 ```bash
+docker network create ocr-net || true
+docker rm -f redis 2>/dev/null || true
 docker run -d --name redis --network ocr-net redis:7-alpine
 ```
 
 5) Start wrapper
 ```bash
-# Run wrapper on same network
-REDIS_URL=${REDIS_URL:-redis://host.docker.internal:6379/0}
-VL_URL=${VL_SERVER_URL:-http://host.docker.internal:8118/v1}
-
 docker run --rm --gpus all --network ocr-net \
-  -e VL_SERVER_URL="http://vllm:8118/v1" \
+  --add-host=host.docker.internal:host-gateway \
+  -e VL_SERVER_URL="http://host.docker.internal:8118/v1" \
   -e REDIS_URL="redis://redis:6379/0" \
   -p 80:8080 paddleocr-vl-service:latest
 ```
