@@ -5,20 +5,20 @@ from typing import Any
 
 from paddleocr import PaddleOCRVL
 
-from .utils import download_pdf_to_tmp
+from .utils import download_to_tmp
 
 _log = logging.getLogger("paddleocr_vl.infer")
 
 
-def run_paddle_ocr_vl_pdf(pdf_url: str) -> dict[str, Any]:
+def run_paddle_ocr_vl_url(url: str) -> dict[str, Any]:
     t0 = time.perf_counter()
-    _log.info("download pdf", extra={"pdf_url": pdf_url})
-    local_pdf = download_pdf_to_tmp(pdf_url)
+    _log.info("download input", extra={"url": url})
+    local_path = download_to_tmp(url)
     # Use vLLM backend for VL recognition
     vl_url = os.getenv("VL_SERVER_URL", "http://127.0.0.1:8118/v1")
     pipeline = PaddleOCRVL(vl_rec_backend="vllm-server", vl_rec_server_url=vl_url)
     _log.info(f"pipeline init (vllm backend) vl_server={vl_url}")
-    output = pipeline.predict(input=local_pdf)
+    output = pipeline.predict(input=local_path)
     _log.info(
         f"predict done elapsed_s={round(time.perf_counter() - t0, 3)} pages={len(output or [])}"
     )
@@ -50,3 +50,8 @@ def run_paddle_ocr_vl_pdf(pdf_url: str) -> dict[str, Any]:
             images[path] = base64.b64encode(buf.getvalue()).decode()
     _log.info(f"images encoded count={len(images)}")
     return {"markdown": markdown_texts, "images": images}
+
+
+def run_paddle_ocr_vl_pdf(pdf_url: str) -> dict[str, Any]:
+    # Backward-compatible alias for PDF inputs
+    return run_paddle_ocr_vl_url(pdf_url)

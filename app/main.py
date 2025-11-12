@@ -58,15 +58,13 @@ def health():
 
 @app.post("/infer")
 async def infer(request: Request, body: dict):
-    pdf_url = body.get("pdf_url")
+    url = body.get("url") or body.get("image_url") or body.get("pdf_url")
     callback_url = body.get("callback_url")
     idem_key = body.get("idempotency_key")
-    if not pdf_url:
-        raise HTTPException(status_code=400, detail="Provide pdf_url")
-    job_id = enqueue_job(pdf_url, callback_url, idem_key)
-    _log.info(
-        "job queued", extra={"job_id": job_id, "pdf_url": pdf_url, "callback": bool(callback_url)}
-    )
+    if not url:
+        raise HTTPException(status_code=400, detail="Provide url (pdf_url or image_url)")
+    job_id = enqueue_job(url, callback_url, idem_key)
+    _log.info("job queued", extra={"job_id": job_id, "url": url, "callback": bool(callback_url)})
     return {"job_id": job_id, "status": "queued"}
 
 

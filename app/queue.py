@@ -66,14 +66,17 @@ def _idempotent_callback(callback_url: str, job_id: str, payload: dict[str, Any]
 
 
 def _process(payload: dict[str, Any]):
-    from .inference import run_paddle_ocr_vl_pdf
+    from .inference import run_paddle_ocr_vl_url
 
     job_id = payload["job_id"]
-    pdf_url = payload["pdf_url"]
+    url = payload.get("url") or payload.get("pdf_url") or payload.get("image_url")
+    if not url:
+        _save_job(job_id, status="failed", error="No input url provided", finished_at=time.time())
+        return
     callback_url = payload.get("callback_url")
     _save_job(job_id, status="running", started_at=time.time())
     try:
-        result = run_paddle_ocr_vl_pdf(pdf_url)
+        result = run_paddle_ocr_vl_url(url)
         # concise summary for observability
         summary_chars = len(result.get("markdown") or "")
         summary_images = len(result.get("images") or {})
@@ -95,12 +98,12 @@ def _process(payload: dict[str, Any]):
             )
 
 
-def enqueue_job(pdf_url: str, callback_url: str | None, idem_key: str | None) -> str:
+def enqueue_job(url: str, callback_url: str | None, idem_key: str | None) -> str:
     job_id = idem_key or str(uuid4())
     if _load_job(job_id):
         return job_id
     _save_job(job_id, status="queued")
-    payload = json.dumps({"job_id": job_id, "pdf_url": pdf_url, "callback_url": callback_url})
+    payload = json.dumps({"job_id": job_id, "url": url, "callback_url": callback_url})
     redis.rpush(_queue_key, payload)
     return job_id
 
