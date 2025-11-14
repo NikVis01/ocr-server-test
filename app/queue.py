@@ -55,7 +55,10 @@ def _idempotent_callback(
     redis.expire(cb_key, 86400)
     try:
         _log.info("callback send", extra={"job_id": job_id, "url": callback_url, "status": status})
-        resp = requests.post(callback_url, json=payload, headers=headers or {}, timeout=15)
+        hdrs = {"Content-Type": "application/json"}
+        if headers:
+            hdrs.update(headers)
+        resp = requests.post(callback_url, json=payload, headers=hdrs, timeout=15)
         if 200 <= resp.status_code < 300:
             _log.info("callback ok", extra={"job_id": job_id, "status_code": resp.status_code})
         else:
@@ -112,6 +115,16 @@ def _process(payload: dict[str, Any]):
             raise RuntimeError("text input not supported")
         else:
             raise RuntimeError("no supported input provided")
+        # shape final result to contract
+        model_name = payload.get("model_id") or "paddle-ocr-vl"
+        pages = [{"page": 1, "text": result.get("markdown") or "", "blocks": []}]
+        final_result = {
+            "model_id": model_name,
+            **({"input_url": url} if url else {}),
+            "pages": pages,
+            "markdown": result.get("markdown") or "",
+            "usage": {"total_tokens": 0},
+        }
         # concise summary for observability
         summary_chars = len(result.get("markdown") or "")
         summary_images = len(result.get("images") or {})
@@ -120,12 +133,12 @@ def _process(payload: dict[str, Any]):
             f"model ok job={job_id} chars={summary_chars} " f"img={summary_images} prev={preview!r}"
         )
         _log.info(msg)
-        _save_job(job_id, status="finished", result=result, finished_at=time.time())
+        _save_job(job_id, status="finished", result=final_result, finished_at=time.time())
         if callback_url:
             _idempotent_callback(
                 callback_url,
                 job_id,
-                {"job_id": job_id, "status": "finished", "result": result},
+                {"job_id": job_id, "status": "finished", "result": final_result},
                 headers=headers,
             )
     except Exception as e:
