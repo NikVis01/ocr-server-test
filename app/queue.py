@@ -58,7 +58,9 @@ def _idempotent_callback(
         hdrs = {"Content-Type": "application/json"}
         if headers:
             hdrs.update(headers)
-        resp = requests.post(callback_url, json=payload, headers=hdrs, timeout=15)
+        resp = requests.post(
+            callback_url, json=payload, headers=hdrs, timeout=15, allow_redirects=False
+        )
         if 200 <= resp.status_code < 300:
             _log.info("callback ok", extra={"job_id": job_id, "status_code": resp.status_code})
         else:
@@ -102,7 +104,11 @@ def _process(payload: dict[str, Any]):
             _idempotent_callback(
                 callback_url,
                 job_id,
-                {"job_id": job_id, "status": "in_progress"},
+                {
+                    "job_id": job_id,
+                    "status": "in_progress",
+                    **({"execution_id": execution_id} if execution_id else {}),
+                },
                 headers=headers,
             )
         local_path = None
@@ -138,7 +144,12 @@ def _process(payload: dict[str, Any]):
             _idempotent_callback(
                 callback_url,
                 job_id,
-                {"job_id": job_id, "status": "finished", "result": final_result},
+                {
+                    "job_id": job_id,
+                    "status": "finished",
+                    "result": final_result,
+                    **({"execution_id": execution_id} if execution_id else {}),
+                },
                 headers=headers,
             )
     except Exception as e:
@@ -147,7 +158,12 @@ def _process(payload: dict[str, Any]):
             _idempotent_callback(
                 callback_url,
                 job_id,
-                {"job_id": job_id, "status": "failed", "error": str(e)},
+                {
+                    "job_id": job_id,
+                    "status": "failed",
+                    "error": str(e),
+                    **({"execution_id": execution_id} if execution_id else {}),
+                },
                 headers=headers,
             )
 
