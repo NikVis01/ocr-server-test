@@ -58,11 +58,33 @@ def _idempotent_callback(
         hdrs = {"Content-Type": "application/json"}
         if headers:
             hdrs.update(headers)
+        # mask sensitive headers for logs
+        log_hdrs = dict(hdrs)
+        if "X-Callback-Token" in log_hdrs:
+            log_hdrs["X-Callback-Token"] = "***"
+        # preview payload for debugging
+        try:
+            preview = json.dumps(payload)[:512]
+        except Exception:
+            preview = str(payload)[:512]
+        _log.info(
+            "callback request",
+            extra={
+                "job_id": job_id,
+                "url": callback_url,
+                "status": status,
+                "headers": log_hdrs,
+                "payload_preview": preview,
+            },
+        )
         resp = requests.post(
             callback_url, json=payload, headers=hdrs, timeout=15, allow_redirects=False
         )
         if 200 <= resp.status_code < 300:
-            _log.info("callback ok", extra={"job_id": job_id, "status_code": resp.status_code})
+            _log.info(
+                "callback ok",
+                extra={"job_id": job_id, "status_code": resp.status_code},
+            )
         else:
             # include small slice of body for debugging
             body = (resp.text or "")[:512]
@@ -101,6 +123,14 @@ def _process(payload: dict[str, Any]):
     try:
         # Optional progress callback
         if callback_url:
+            _log.info(
+                "callback progress emit",
+                extra={
+                    "job_id": job_id,
+                    "has_exec_id": bool(execution_id),
+                    "url": callback_url,
+                },
+            )
             _idempotent_callback(
                 callback_url,
                 job_id,
@@ -139,6 +169,18 @@ def _process(payload: dict[str, Any]):
             f"model ok job={job_id} chars={summary_chars} " f"img={summary_images} prev={preview!r}"
         )
         _log.info(msg)
+        # log final payload shape for debugging
+        _log.info(
+            "final callback payload shape",
+            extra={
+                "job_id": job_id,
+                "pages_len": len(final_result.get("pages") or []),
+                "has_markdown": bool(final_result.get("markdown")),
+                "has_input_url": "input_url" in final_result,
+                "has_usage": "usage" in final_result,
+                "has_exec_id": bool(execution_id),
+            },
+        )
         _save_job(job_id, status="finished", result=final_result, finished_at=time.time())
         if callback_url:
             _idempotent_callback(
