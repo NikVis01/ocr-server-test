@@ -41,15 +41,21 @@ def _load_job(job_id: str) -> dict[str, Any] | None:
     return out
 
 
-def _idempotent_callback(callback_url: str, job_id: str, payload: dict[str, Any]) -> None:
+def _idempotent_callback(
+    callback_url: str,
+    job_id: str,
+    payload: dict[str, Any],
+    headers: dict[str, str] | None = None,
+) -> None:
     # best-effort idempotency across instances using Redis
-    cb_key = f"idemp:cb:{job_id}:{hash(callback_url)}"
+    status = payload.get("status") or "unknown"
+    cb_key = f"idemp:cb:{job_id}:{status}:{hash(callback_url)}"
     if not redis.setnx(cb_key, "1"):
         return
     redis.expire(cb_key, 86400)
     try:
-        _log.info("callback send", extra={"job_id": job_id, "url": callback_url})
-        resp = requests.post(callback_url, json=payload, timeout=15)
+        _log.info("callback send", extra={"job_id": job_id, "url": callback_url, "status": status})
+        resp = requests.post(callback_url, json=payload, headers=headers or {}, timeout=15)
         if 200 <= resp.status_code < 300:
             _log.info("callback ok", extra={"job_id": job_id, "status_code": resp.status_code})
         else:
@@ -67,16 +73,45 @@ def _idempotent_callback(callback_url: str, job_id: str, payload: dict[str, Any]
 
 def _process(payload: dict[str, Any]):
     from .inference import run_paddle_ocr_vl_url
+    from .utils import save_base64_image_to_tmp
 
     job_id = payload["job_id"]
+    # New contract
+    input_obj = payload.get("input") or {}
+    execution_id = payload.get("execution_id")
+    callback_token = payload.get("callback_token")
+    callback_url = payload.get("callback_url")
+    headers = {}
+    if execution_id:
+        headers["X-Execution-Id"] = str(execution_id)
+    if callback_token:
+        headers["X-Callback-Token"] = str(callback_token)
+    # Back-compat fields
     url = payload.get("url") or payload.get("pdf_url") or payload.get("image_url")
     if not url:
-        _save_job(job_id, status="failed", error="No input url provided", finished_at=time.time())
-        return
-    callback_url = payload.get("callback_url")
+        url = input_obj.get("url") or input_obj.get("pdf_url") or input_obj.get("image_url")
+    image_b64 = input_obj.get("image_data")
+    text_input = (input_obj.get("text") or "").strip()
     _save_job(job_id, status="running", started_at=time.time())
     try:
-        result = run_paddle_ocr_vl_url(url)
+        # Optional progress callback
+        if callback_url:
+            _idempotent_callback(
+                callback_url,
+                job_id,
+                {"job_id": job_id, "status": "in_progress"},
+                headers=headers,
+            )
+        local_path = None
+        if image_b64:
+            local_path = save_base64_image_to_tmp(image_b64)
+            result = run_paddle_ocr_vl_url(local_path)
+        elif url:
+            result = run_paddle_ocr_vl_url(url)
+        elif text_input:
+            raise RuntimeError("text input not supported")
+        else:
+            raise RuntimeError("no supported input provided")
         # concise summary for observability
         summary_chars = len(result.get("markdown") or "")
         summary_images = len(result.get("images") or {})
@@ -88,13 +123,19 @@ def _process(payload: dict[str, Any]):
         _save_job(job_id, status="finished", result=result, finished_at=time.time())
         if callback_url:
             _idempotent_callback(
-                callback_url, job_id, {"job_id": job_id, "status": "finished", "result": result}
+                callback_url,
+                job_id,
+                {"job_id": job_id, "status": "finished", "result": result},
+                headers=headers,
             )
     except Exception as e:
         _save_job(job_id, status="failed", error=str(e), finished_at=time.time())
         if callback_url:
             _idempotent_callback(
-                callback_url, job_id, {"job_id": job_id, "status": "failed", "error": str(e)}
+                callback_url,
+                job_id,
+                {"job_id": job_id, "status": "failed", "error": str(e)},
+                headers=headers,
             )
 
 
@@ -105,6 +146,17 @@ def enqueue_job(url: str, callback_url: str | None, idem_key: str | None) -> str
     _save_job(job_id, status="queued")
     payload = json.dumps({"job_id": job_id, "url": url, "callback_url": callback_url})
     redis.rpush(_queue_key, payload)
+    return job_id
+
+
+def enqueue_job_payload(job_payload: dict[str, Any], idem_key: str | None) -> str:
+    job_id = idem_key or str(uuid4())
+    if _load_job(job_id):
+        return job_id
+    job_payload = dict(job_payload)
+    job_payload["job_id"] = job_id
+    _save_job(job_id, status="queued")
+    redis.rpush(_queue_key, json.dumps(job_payload))
     return job_id
 
 

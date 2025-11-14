@@ -5,7 +5,7 @@ import time
 import requests
 from fastapi import FastAPI, HTTPException, Request
 
-from .queue import enqueue_job, get_job, start_worker
+from .queue import enqueue_job, enqueue_job_payload, get_job, start_worker
 
 app = FastAPI(title="PaddleOCR-VL Service")
 
@@ -58,6 +58,37 @@ def health():
 
 @app.post("/infer")
 async def infer(request: Request, body: dict):
+    # New contract: model_id, input{}, execution_id, callback_url, callback_token
+    if isinstance(body.get("input"), dict):
+        input_obj = body["input"]
+        execution_id = body.get("execution_id")
+        callback_url = body.get("callback_url")
+        callback_token = body.get("callback_token")
+        model_id = body.get("model_id")
+        idem_key = body.get("idempotency_key")
+        if not execution_id or not callback_url or not callback_token:
+            raise HTTPException(
+                status_code=400,
+                detail="Provide execution_id, callback_url, and callback_token",
+            )
+        payload = {
+            "model_id": model_id,
+            "input": input_obj,
+            "execution_id": execution_id,
+            "callback_url": callback_url,
+            "callback_token": callback_token,
+        }
+        job_id = enqueue_job_payload(payload, idem_key)
+        _log.info(
+            "job queued",
+            extra={
+                "job_id": job_id,
+                "has_input": bool(input_obj),
+                "callback": True,
+            },
+        )
+        return {"job_id": job_id, "status": "queued"}
+    # Back-compat contract
     url = body.get("url") or body.get("image_url") or body.get("pdf_url")
     callback_url = body.get("callback_url")
     idem_key = body.get("idempotency_key")

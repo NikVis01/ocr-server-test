@@ -32,3 +32,17 @@ def download_to_tmp(url: str, prefer_suffix: str | None = None) -> str:
     with os.fdopen(fd, "wb") as f:
         f.write(resp.content)
     return path
+
+
+def save_base64_image_to_tmp(image_b64: str) -> str:
+    import base64
+    import imghdr
+
+    raw = base64.b64decode(image_b64, validate=True)
+    # guess type for suffix
+    kind = imghdr.what(None, h=raw) or "png"
+    suffix = ".png" if kind == "png" else ".jpg"
+    fd, path = tempfile.mkstemp(suffix=suffix)
+    with os.fdopen(fd, "wb") as f:
+        f.write(raw)
+    return path
