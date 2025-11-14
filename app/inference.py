@@ -13,7 +13,8 @@ _log = logging.getLogger("paddleocr_vl.infer")
 def run_paddle_ocr_vl_url(url: str) -> dict[str, Any]:
     t0 = time.perf_counter()
     _log.info("download input", extra={"url": url})
-    local_path = download_to_tmp(url)
+    # Accept both URLs and local file paths
+    local_path = url if os.path.isfile(url) else download_to_tmp(url)
     # Use vLLM backend for VL recognition
     vl_url = os.getenv("VL_SERVER_URL", "http://127.0.0.1:8118/v1")
     pipeline = PaddleOCRVL(vl_rec_backend="vllm-server", vl_rec_server_url=vl_url)

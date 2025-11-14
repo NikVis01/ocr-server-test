@@ -61,22 +61,22 @@ async def infer(request: Request, body: dict):
     # New contract: model_id, input{}, execution_id, callback_url, callback_token
     if isinstance(body.get("input"), dict):
         input_obj = body["input"]
-        execution_id = body.get("execution_id")
+        execution_id = body.get("execution_id") or request.headers.get("X-Execution-Id")
         callback_url = body.get("callback_url")
-        callback_token = body.get("callback_token")
+        callback_token = body.get("callback_token") or request.headers.get("X-Callback-Token")
         model_id = body.get("model_id")
         idem_key = body.get("idempotency_key")
-        if not execution_id or not callback_url or not callback_token:
+        if not execution_id or not callback_url:
             raise HTTPException(
                 status_code=400,
-                detail="Provide execution_id, callback_url, and callback_token",
+                detail="Provide execution_id and callback_url",
             )
         payload = {
             "model_id": model_id,
             "input": input_obj,
             "execution_id": execution_id,
             "callback_url": callback_url,
-            "callback_token": callback_token,
+            **({"callback_token": callback_token} if callback_token else {}),
         }
         job_id = enqueue_job_payload(payload, idem_key)
         _log.info(
